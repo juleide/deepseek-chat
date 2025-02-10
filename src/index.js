@@ -32,8 +32,8 @@ const setupConfig = async () => {
     {
       type: 'input',
       name: 'modelName',
-      message: '请输入模型名称（默认：DeepSeek-V3）：',
-      default: 'DeepSeek-V3'
+      message: '请输入模型名称（默认：deepseek-ai/DeepSeek-V3）：',
+      default: 'deepseek-ai/DeepSeek-V3'
     },
     {
       type: 'input',
@@ -50,7 +50,12 @@ const setupConfig = async () => {
   ]);
   
   config.set(answers);
-  console.log(chalk.green('✅ 配置已保存！'));
+  // 输出配置信息
+  console.log(chalk.cyan('\n🚀 配置信息：'));
+  console.log(chalk.cyan(`   模型名称：${answers.modelName}`));
+  console.log(chalk.cyan(`   API密钥：${answers.apiKey}`));
+  console.log(chalk.cyan(`   API地址：${answers.baseURL}`));
+  console.log(chalk.green('✅ 配置已保存！运行deepseek-chat chat开始聊天\n'));
 };
 
 // 聊天会话
@@ -68,7 +73,7 @@ const startChat = async () => {
   
   console.log(chalk.cyan('\n💬 进入聊天模式 \n'));
   
-  const modelName = config.get('modelName') || 'deepseek-chat';
+  const modelName = config.get('modelName');
   const chatLoop = async () => {
     rl.question(chalk.blue('你： '), async (input) => {
       if (input.toLowerCase() === 'exit') {
@@ -80,7 +85,7 @@ const startChat = async () => {
         process.stdout.write(chalk.green('DeepSeek：'));
         
         const response = await client.post('/chat/completions', {
-          model: `deepseek-ai/${modelName}`,
+          model: modelName,
           messages: [{ role: 'user', content: input }],
           stream: true
         }, {
@@ -124,6 +129,16 @@ program
 program.command('config')
   .description('配置API参数')
   .action(setupConfig);
+
+program.command('remote')
+  .description('查看config配置')
+  .action(() => {
+    const conf = config.all;
+    console.log(chalk.cyan('\n🚀 配置信息：'));
+    console.log(chalk.cyan(`   模型名称：${conf.modelName}`));
+    console.log(chalk.cyan(`   API密钥：${conf.apiKey}`));
+    console.log(chalk.cyan(`   API地址：${conf.baseURL}`));
+  });
 
 program.command('chat')
   .description('启动聊天')
