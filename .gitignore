@@ -1,0 +1,8 @@
+.vscode
+.history
+node_modules
+
+### Node template
+# Logs
+logs
+*.log
