@@ -71,11 +71,15 @@ const startChat = async () => {
     output: process.stdout
   });
   
-  console.log(chalk.cyan('\n💬 进入聊天模式 \n'));
+  console.log(chalk.cyan('\n💬 进入聊天模式，Ctrl+X 停止大模型生成 \n'));
   
   const modelName = config.get('modelName');
   const chatLoop = async () => {
     rl.question(chalk.blue('你： '), async (input) => {
+      if (input.trim() === '') {
+        chatLoop();
+        return;
+      }
       if (input.toLowerCase() === 'exit') {
         rl.close();
         return;
@@ -92,6 +96,17 @@ const startChat = async () => {
           responseType: 'stream'
         });
 
+        // 监听 Ctrl+X 终止回复
+        const keypressHandler = (str, key) => {
+          if (key.ctrl && key.name === 'x') {
+            console.log(chalk.cyan('\n💬 已停止生成，请继续输入... \n'));
+            response.data.destroy(); // 中断流
+            rl.input.removeListener('keypress', keypressHandler); // 移除监听器
+            chatLoop();
+          }
+        };
+        rl.input.on('keypress', keypressHandler);
+
         response.data.on('data', chunk => {
           const lines = chunk.toString().split('\n').filter(line => line.trim());
           for (const line of lines) {
@@ -107,6 +122,7 @@ const startChat = async () => {
 
         response.data.on('end', () => {
           console.log('\n');
+          rl.input.removeListener('keypress', keypressHandler); // 移除监听器
           chatLoop();
         });
 

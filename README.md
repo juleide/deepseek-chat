@@ -67,5 +67,15 @@ $ deepseek-chat chat
 DeepSeek： 你好！有什么我可以帮你的吗？
 ```
 
+## 显示已配置的 API 参数
+```bash
+deepseek-chat remote
+
+🚀 配置信息：
+   模型名称：deepseek-ai/DeepSeek-V3
+   API密钥：sk-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+   API地址：https://api.siliconflow.cn/v1
+```
+
 ## 许可证
 本项目基于 MIT 许可证 开源。
