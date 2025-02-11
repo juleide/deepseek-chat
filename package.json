@@ -1,5 +1,5 @@
 {
-  "name": "deepseek-cli-chat",
+  "name": "deepseek-chat",
   "version": "1.0.0",
   "description": "DeepSeek命令行聊天工具",
   "main": "src/index.js",
@@ -22,5 +22,8 @@
     "commander": "^13.1.0",
     "configstore": "^7.0.0",
     "inquirer": "^12.4.1"
+  },
+  "engines": {
+    "node": ">=16"
   }
 }

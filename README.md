@@ -1,4 +1,4 @@
-# DeepSeek CLI Chat
+# DeepSeek Chat
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
 
@@ -17,7 +17,7 @@
 通过 npm 全局安装：
 
 ```bash
-npm install -g deepseek-cli-chat
+npm install -g deepseek-chat
 ```
 
 ## 配置 API 参数
@@ -27,7 +27,7 @@ deepseek-chat config
 ```
 按照提示输入以下信息：
 
-模型名称：默认DeepSeek-V3
+模型名称：默认deepseek-ai/DeepSeek-V3
 
 API 密钥：您的 DeepSeek API 密钥。
 
@@ -52,7 +52,7 @@ deepseek-chat --help
 ```bash
 $ deepseek-chat config
 🌟 首次使用需要配置API参数
-? 请输入模型名称：DeepSeek-V3
+? 请输入模型名称：deepseek-ai/DeepSeek-V3
 ? 请输入Deepseek API密钥： sk-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 ? API基础地址（默认：https://api.deepseek.com/v1）： https://api.deepseek.com/v1
 ✅ 配置已保存！
