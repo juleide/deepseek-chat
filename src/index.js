@@ -88,6 +88,14 @@ const startChat = async () => {
       try {
         process.stdout.write(chalk.green('DeepSeek：'));
         
+        // 显示loading动画
+        const loadingChars = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏'];
+        let loadingIndex = 0;
+        const loadingInterval = setInterval(() => {
+          process.stdout.write(`\r${chalk.green('DeepSeek：')} ${loadingChars[loadingIndex]}`);
+          loadingIndex = (loadingIndex + 1) % loadingChars.length;
+        }, 100);
+        
         const response = await client.post('/chat/completions', {
           model: modelName,
           messages: [{ role: 'user', content: input }],
@@ -95,6 +103,10 @@ const startChat = async () => {
         }, {
           responseType: 'stream'
         });
+        
+        // 清除loading动画
+        clearInterval(loadingInterval);
+        process.stdout.write(`\r${chalk.green('DeepSeek：')}`);
 
         // 监听 Ctrl+X 终止回复
         const keypressHandler = (str, key) => {
