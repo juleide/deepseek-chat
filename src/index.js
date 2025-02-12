@@ -85,13 +85,14 @@ const startChat = async () => {
         return;
       }
       
+      let loadingInterval
       try {
         process.stdout.write(chalk.green('DeepSeek：'));
         
         // 显示loading动画
         const loadingChars = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏'];
         let loadingIndex = 0;
-        const loadingInterval = setInterval(() => {
+        loadingInterval = setInterval(() => {
           process.stdout.write(`\r${chalk.green('DeepSeek：')} ${loadingChars[loadingIndex]}`);
           loadingIndex = (loadingIndex + 1) % loadingChars.length;
         }, 100);
@@ -139,6 +140,7 @@ const startChat = async () => {
         });
 
       } catch (error) {
+        clearInterval(loadingInterval);  // 清除loading动画
         console.error(chalk.red('\n❌ 请求失败：'), error.message);
         chatLoop();
       }
