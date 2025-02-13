@@ -7,38 +7,31 @@ import Configstore from 'configstore';
 import { createInterface } from 'readline';
 
 // 初始化配置存储
-import pkg from '../package.json' assert { type: 'json' };
+import { createRequire } from 'module';
+const require = createRequire(import.meta.url);
+
+const pkg = require('../package.json');
 const config = new Configstore(pkg.name);
 
-// 初始化API客户端
-const createClient = () => {
-  const apiKey = config.get('apiKey');
-  const baseURL = config.get('baseURL') || 'https://api.deepseek.com/v1';
-  
-  return axios.create({
-    baseURL,
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${apiKey}`
-    }
-  });
-};
-
-// 配置向导
-const setupConfig = async () => {
-  console.log(chalk.yellow('\n🌟 首次使用需要配置API参数\n'));
-  
+// 添加配置管理
+const addConfig = async () => {
   const answers = await inquirer.prompt([
     {
       type: 'input',
-      name: 'modelName',
-      message: '请输入模型名称（默认：deepseek-ai/DeepSeek-V3）：',
+      name: 'configName',
+      message: '请输入模型名称：',
+      validate: input => !!input || '模型名称不能为空'
+    },
+    {
+      type: 'input',
+      name: 'model_ID',
+      message: '请输入模型ID（默认：deepseek-ai/DeepSeek-V3）：',
       default: 'deepseek-ai/DeepSeek-V3'
     },
     {
       type: 'input',
       name: 'apiKey',
-      message: '请输入Deepseek API密钥：',
+      message: '请输入模型API密钥：',
       validate: input => !!input || 'API密钥不能为空'
     },
     {
@@ -49,31 +42,213 @@ const setupConfig = async () => {
     }
   ]);
   
-  config.set(answers);
-  // 输出配置信息
-  console.log(chalk.cyan('\n🚀 配置信息：'));
-  console.log(chalk.cyan(`   模型名称：${answers.modelName}`));
-  console.log(chalk.cyan(`   API密钥：${answers.apiKey}`));
-  console.log(chalk.cyan(`   API地址：${answers.baseURL}`));
-  console.log(chalk.green('✅ 配置已保存！运行deepseek-chat chat开始聊天\n'));
+  const configs = config.get('configs') || {};
+  configs[answers.configName] = {
+    model_ID: answers.model_ID,
+    apiKey: answers.apiKey,
+    baseURL: answers.baseURL
+  };
+  config.set('configs', configs);
+  console.log(chalk.green(`✅ 模型配置 ${answers.configName} 已保存！`));
+};
+
+// 选择配置
+const selectConfig = async () => {
+  const configs = config.get('configs') || {};
+  if (Object.keys(configs).length === 0) {
+    console.log(chalk.red('⚠️ 没有可用的模型，请先添加模型配置'));
+    return;
+  }
+
+  const currentConfig = config.get('currentConfig');
+  const { selectedConfig } = await inquirer.prompt([
+    {
+      type: 'list',
+      name: 'selectedConfig',
+      message: '请选择要使用的模型：',
+      choices: Object.keys(configs),
+      default: currentConfig || ''
+    }
+  ]);
+
+  config.set('currentConfig', selectedConfig);
+  console.log(chalk.green(`✅ 已切换到模型 ${selectedConfig}`));
+  startChat();
+};
+
+// 修改模型配置
+const editConfig = async () => {
+  const configs = config.get('configs') || {};
+  if (Object.keys(configs).length === 0) {
+    console.log(chalk.red('⚠️ 没有可用的模型，请先添加模型配置'));
+    return;
+  }
+  const { selectedConfig } = await inquirer.prompt([
+    {
+      type: 'list',
+      name: 'selectedConfig',
+      message: '请选择要修改的模型：',
+      choices: Object.keys(configs)
+    }
+  ]);
+
+  const { model_ID, apiKey, baseURL } = configs[selectedConfig];
+  const answers = await inquirer.prompt([
+    {
+      type: 'input',
+      name: 'configName',
+      message: '请输入模型名称：',
+      default: selectedConfig
+    },
+    {
+      type: 'input',
+      name: 'model_ID',
+      message: '请输入模型ID：',
+      default: model_ID
+    },
+    {
+      type: 'input',
+      name: 'apiKey',
+      message: '请输入模型API密钥：',
+      default: apiKey
+    },
+    {
+      type: 'input',
+      name: 'baseURL',
+      message: 'API基础地址：',
+      default: baseURL
+    }
+  ]);
+  // configName
+  if (selectedConfig !== answers.configName) {
+    delete configs[selectedConfig];
+  }
+  configs[answers.configName] = {
+    model_ID: answers.model_ID,
+    apiKey: answers.apiKey,
+    baseURL: answers.baseURL
+  };
+
+  config.set('configs', configs);
+  console.log(chalk.green(`✅ 模型 ${selectedConfig} 配置已更新！`));
+}
+
+// 删除模型配置
+const deleteConfig = async () => {
+  const configs = config.get('configs') || {};
+  if (Object.keys(configs).length === 0) {
+    console.log(chalk.red('⚠️ 没有可用的模型，请先添加模型配置'));
+    return;
+  }
+  const { selectedConfig } = await inquirer.prompt([
+    {
+      type: 'list',
+      name: 'selectedConfig',
+      message: '请选择要删除的模型：',
+      choices: Object.keys(configs)
+    }
+  ]);
+
+  // 删除确认
+  const { confirm } = await inquirer.prompt([
+    {
+      type: 'confirm',
+      name: 'confirm',
+      message: `确认删除模型 ${selectedConfig} 吗？`
+    }
+  ]);
+  if (!confirm) return;
+
+  delete configs[selectedConfig];
+  config.set('configs', configs);
+  console.log(chalk.green(`✅ 模型 ${selectedConfig} 已删除！`));
+};
+
+// 删除所有配置
+const deleteAllConfigs = async () => {
+  const configs = config.get('configs') || {};
+  if (Object.keys(configs).length === 0) {
+    console.log(chalk.red('⚠️ 没有可用的模型，请先添加模型配置'));
+    return;
+  }
+
+  // 删除确认
+  const { confirm } = await inquirer.prompt([
+    {
+      type: 'confirm',
+      name: 'confirm',
+      message: `warning：确认删除所有模型配置吗？`
+    }
+  ]);
+  if (!confirm) return;
+
+  config.delete('configs');
+  config.delete('currentConfig');
+  console.log(chalk.green(`✅ 所有模型配置已删除！`));
+};
+
+// 显示模型列表
+const showConfigs = () => {
+  const configs = config.get('configs') || {};
+  const currentConfig = config.get('currentConfig');
+  console.log(chalk.cyan('\n🚀 配置信息 \n'));
+  for (const [name, conf] of Object.entries(configs)) {
+    console.log(chalk.cyan(` ${name === currentConfig ? chalk.red('* ') : '  '}模型名称：${name}`));
+    console.log(chalk.cyan(`   模型ID：${conf.model_ID}`));
+    console.log(chalk.cyan(`   API密钥：${conf.apiKey}`));
+    console.log(chalk.cyan(`   API地址：${conf.baseURL}\n`));
+  }
+};
+
+// 显示插件信息
+const showInfo = () => {
+  console.log(chalk.cyan('\n🚀 插件信息 \n'));
+  console.log(chalk.cyan(`  版本：${pkg.version}`));
+  console.log(chalk.cyan(`  作者：${pkg.author.name}`));
+  console.log(chalk.cyan(`  项目地址：${pkg.repository.url}\n`));
+  console.log(chalk.red('  💗 WangYanPing (✪ω✪) \n'));
+};
+
+// 初始化API客户端
+const createClient = () => {
+  const configs = config.get('configs') || {};
+  const currentConfig = config.get('currentConfig');
+
+  const { apiKey, baseURL } = configs[currentConfig];
+  return axios.create({
+    baseURL,
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${apiKey}`
+    }
+  });
 };
 
 // 聊天会话
 const startChat = async () => {
-  if (!config.size) {
-    console.log(chalk.red('⚠️  请先配置API参数'));
-    await setupConfig();
+  const configs = config.get('configs') || {};
+  const currentConfig = config.get('currentConfig');
+
+  if (Object.keys(configs).length === 0) {
+    console.log(chalk.red('⚠️ 没有可用的模型配置，请先添加模型'));
+    return
+  }
+
+  if (!currentConfig || !configs[currentConfig]) {
+    await selectConfig();
+    return;
   }
   
+  const { model_ID } = configs[currentConfig];
   const client = createClient();
+
   const rl = createInterface({
     input: process.stdin,
     output: process.stdout
   });
   
-  console.log(chalk.cyan('\n💬 进入聊天模式，Ctrl+X 停止大模型生成 \n'));
+  console.log(chalk.cyan(`\n💬 进入【${model_ID}】聊天模式 \n`));
   
-  const modelName = config.get('modelName');
   const chatLoop = async () => {
     rl.question(chalk.blue('你： '), async (input) => {
       if (input.trim() === '') {
@@ -87,27 +262,25 @@ const startChat = async () => {
       
       let loadingInterval
       try {
-        process.stdout.write(chalk.green('DeepSeek：'));
-        
         // 显示loading动画
         const loadingChars = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏'];
         let loadingIndex = 0;
         loadingInterval = setInterval(() => {
-          process.stdout.write(`\r${chalk.green('DeepSeek：')} ${loadingChars[loadingIndex]}`);
+          process.stdout.write(`\r${chalk.green(`${currentConfig}：`)} ${loadingChars[loadingIndex]}`);
           loadingIndex = (loadingIndex + 1) % loadingChars.length;
         }, 100);
         
         const response = await client.post('/chat/completions', {
-          model: modelName,
+          model: model_ID,
           messages: [{ role: 'user', content: input }],
           stream: true
         }, {
           responseType: 'stream'
         });
-        
+
         // 清除loading动画
         clearInterval(loadingInterval);
-        process.stdout.write(`\r${chalk.green('DeepSeek：')}`);
+        process.stdout.write(`\r${chalk.green(`${currentConfig}：`)}`);
 
         // 监听 Ctrl+X 终止回复
         const keypressHandler = (str, key) => {
@@ -156,19 +329,34 @@ program
   .description('DeepSeek 命令行聊天工具')
   .version(pkg.version);
 
-program.command('config')
-  .description('配置API参数')
-  .action(setupConfig);
+// 添加新命令
+program.command('add')
+  .description('添加新的模型配置')
+  .action(addConfig);
 
-program.command('remote')
-  .description('查看config配置')
-  .action(() => {
-    const conf = config.all;
-    console.log(chalk.cyan('\n🚀 配置信息：'));
-    console.log(chalk.cyan(`   模型名称：${conf.modelName}`));
-    console.log(chalk.cyan(`   API密钥：${conf.apiKey}`));
-    console.log(chalk.cyan(`   API地址：${conf.baseURL}`));
-  });
+program.command('switch')
+  .description('切换当前使用的模型配置')
+  .action(selectConfig);
+
+program.command('edit')
+  .description('编辑模型配置')
+  .action(editConfig);
+
+program.command('delete')
+  .description('删除模型配置')
+  .action(deleteConfig);
+
+program.command('deleteAll')
+  .description('删除所有模型配置')
+  .action(deleteAllConfigs);
+
+program.command('list')
+  .description('查看所有模型配置')
+  .action(showConfigs);
+
+program.command('info')
+  .description('查看插件信息')
+  .action(showInfo);
 
 program.command('chat')
   .description('启动聊天')
