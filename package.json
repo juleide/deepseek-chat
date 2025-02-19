@@ -1,6 +1,6 @@
 {
   "name": "deepseek-chat",
-  "version": "2.0.1",
+  "version": "2.0.2",
   "description": "DeepSeek命令行聊天工具",
   "main": "src/index.js",
   "type": "module",

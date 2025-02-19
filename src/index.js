@@ -18,7 +18,7 @@ const addConfig = async () => {
   const answers = await inquirer.prompt([
     {
       type: 'input',
-      name: 'configName',
+      name: 'modelName',
       message: '请输入模型名称：',
       validate: input => !!input || '模型名称不能为空'
     },
@@ -43,13 +43,13 @@ const addConfig = async () => {
   ]);
   
   const configs = config.get('configs') || {};
-  configs[answers.configName] = {
+  configs[answers.modelName] = {
     model_ID: answers.model_ID,
     apiKey: answers.apiKey,
     baseURL: answers.baseURL
   };
   config.set('configs', configs);
-  console.log(chalk.green(`✅ 模型配置 ${answers.configName} 已保存！`));
+  console.log(chalk.green(`✅ 模型配置 ${answers.modelName} 已保存！`));
 };
 
 // 选择配置
@@ -96,7 +96,7 @@ const editConfig = async () => {
   const answers = await inquirer.prompt([
     {
       type: 'input',
-      name: 'configName',
+      name: 'modelName',
       message: '请输入模型名称：',
       default: selectedConfig
     },
@@ -119,11 +119,11 @@ const editConfig = async () => {
       default: baseURL
     }
   ]);
-  // configName
-  if (selectedConfig !== answers.configName) {
+  // modelName
+  if (selectedConfig !== answers.modelName) {
     delete configs[selectedConfig];
   }
-  configs[answers.configName] = {
+  configs[answers.modelName] = {
     model_ID: answers.model_ID,
     apiKey: answers.apiKey,
     baseURL: answers.baseURL
@@ -225,7 +225,7 @@ const createClient = () => {
 };
 
 // 聊天会话
-const startChat = async () => {
+const startChat = async (options) => {
   const configs = config.get('configs') || {};
   const currentConfig = config.get('currentConfig');
 
@@ -241,6 +241,8 @@ const startChat = async () => {
   
   const { model_ID } = configs[currentConfig];
   const client = createClient();
+  const max = options?.max || 1;
+  let messages = [];
 
   const rl = createInterface({
     input: process.stdin,
@@ -269,10 +271,18 @@ const startChat = async () => {
           process.stdout.write(`\r${chalk.green(`${currentConfig}：`)} ${loadingChars[loadingIndex]}`);
           loadingIndex = (loadingIndex + 1) % loadingChars.length;
         }, 100);
+
+        // 添加新消息到历史记录
+        messages.push({ role: 'user', content: input });
+
+        // 控制历史记录长度
+        if (messages.length > max) {
+          messages = messages.slice(-max);
+        }
         
         const response = await client.post('/chat/completions', {
           model: model_ID,
-          messages: [{ role: 'user', content: input }],
+          messages: messages,
           stream: true
         }, {
           responseType: 'stream'
@@ -280,7 +290,7 @@ const startChat = async () => {
 
         // 清除loading动画
         clearInterval(loadingInterval);
-        process.stdout.write(`\r${chalk.green(`${currentConfig}：`)}`);
+        process.stdout.write(`\r${chalk.green(`${currentConfig}：`)} `);
 
         // 监听 Ctrl+X 终止回复
         const keypressHandler = (str, key) => {
@@ -293,13 +303,24 @@ const startChat = async () => {
         };
         rl.input.on('keypress', keypressHandler);
 
+        let assistantResponse = '';
+        let hasResponse = false;
         response.data.on('data', chunk => {
           const lines = chunk.toString().split('\n').filter(line => line.trim());
           for (const line of lines) {
             try {
               const message = line.replace(/^data: /, '');
               const parsed = JSON.parse(message);
-              process.stdout.write(parsed.choices[0].delta.content || '');
+              const content = parsed.choices[0].delta.content || '';
+              if (!hasResponse) {
+                if (content.trim() === '') {
+                  continue;
+                } else {
+                  hasResponse = true;
+                }
+              }
+              process.stdout.write(content);
+              assistantResponse += content;
             } catch (err) {
               // 处理非JSON响应
             }
@@ -307,6 +328,8 @@ const startChat = async () => {
         });
 
         response.data.on('end', () => {
+          // 将助手回复添加到历史记录
+          messages.push({ role: 'assistant', content: assistantResponse });
           console.log('\n');
           rl.input.removeListener('keypress', keypressHandler); // 移除监听器
           chatLoop();
@@ -319,6 +342,10 @@ const startChat = async () => {
       }
     });
   };
+
+  function removeLeadingSpaces(str) {
+    return str.replace(/^\s+/, '');
+  }
 
   chatLoop();
 };
@@ -360,6 +387,7 @@ program.command('info')
 
 program.command('chat')
   .description('启动聊天')
+  .option('-m, --max <number>', '设置历史记录最大长度', parseInt)
   .action(startChat);
 
 program.parse();
