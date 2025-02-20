@@ -288,10 +288,6 @@ const startChat = async (options) => {
           responseType: 'stream'
         });
 
-        // 清除loading动画
-        clearInterval(loadingInterval);
-        process.stdout.write(`\r${chalk.green(`${currentConfig}：`)} `);
-
         // 监听 Ctrl+X 终止回复
         const keypressHandler = (str, key) => {
           if (key.ctrl && key.name === 'x') {
@@ -313,9 +309,16 @@ const startChat = async (options) => {
               const parsed = JSON.parse(message);
               const content = parsed.choices[0].delta.content || '';
               if (!hasResponse) {
+                // 空字符串或匹配到多个换行符
+                if (content.trim() === '' || content.match(/\n{1,}/)) {
+                  continue;
+                }
                 if (content.trim() === '') {
                   continue;
                 } else {
+                  // 清除loading动画
+                  clearInterval(loadingInterval);
+                  process.stdout.write(`\r${chalk.green(`${currentConfig}：`)} `);
                   hasResponse = true;
                 }
               }
